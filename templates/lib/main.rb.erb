@@ -1,0 +1,21 @@
+# frozen_string_literal: true
+
+#--
+# SPDX-FileCopyrightText: <%= year %> <%= copyright_holder %>
+#
+# SPDX-License-Identifier: <%= license %>
+#++
+
+require_relative "<%= require_path %>/version"
+
+# Top-level namespace for <%= gem_name %>.
+<% if description.empty? -%>
+# (Describe the gem here.)
+<% else -%>
+# <%= description %>
+<% end -%>
+module <%= module_name %>
+  # Raised when a domain invariant is violated.
+  class Error < StandardError
+  end
+end

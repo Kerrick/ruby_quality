@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+#--
+# SPDX-FileCopyrightText: <%= year %> <%= copyright_holder %>
+#
+# SPDX-License-Identifier: <%= license %>
+#++
+
+require_relative "test_helper"
+
+# Smoke test for the gem skeleton.
+class <%= module_name.split("::").join %>Test < Minitest::Test
+  def test_version_is_defined
+    refute_nil <%= module_name %>::VERSION
+  end
+end

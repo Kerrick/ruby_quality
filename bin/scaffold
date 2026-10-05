@@ -9,10 +9,15 @@
 # Renders ruby_quality templates into a target repo.
 #
 #   bin/scaffold GEM_NAME [--dir PATH] [--author NAME] [--email EMAIL]
-#                        [--license ID] [--ruby-quality PATH] [--update]
+#                        [--license ID] [--description TEXT]
+#                        [--ruby-quality PATH] [--rust] [--dry-run] [--update]
 #
-# Scaffold mode writes every template. Update mode (used by bin/propagate)
-# re-renders only SHARED_FILES, diffing before overwrite.
+# Scaffold mode writes every template. Pure-Ruby projects are the default;
+# pass --rust to opt into the RbSys native-extension Rakefile, Gemfile, and
+# Rust quality gates. Skeleton files (gemspec, lib/, sig/, test/, exe/,
+# CHANGELOG.md) are only written when missing, never overwritten.
+# Update mode (used by bin/propagate) re-renders only SHARED_FILES, diffing
+# before overwrite. --dry-run previews without writing.
 
 require "erb"
 require "fileutils"
@@ -28,6 +33,9 @@ SCAFFOLD_ONCE = %w[
   Gemfile.erb
   REUSE.toml.erb
   bin/console.erb
+  gitignore.erb
+  tasks/rbs_exceptions.rb.erb
+  tasks/clippy_exceptions.rb.erb
 ].freeze
 
 # Shared templates: safe to re-render into consumers on every propagate.
@@ -44,15 +52,30 @@ SHARED = %w[
   tasks/shared/test.rake.erb
 ].freeze
 
+# Skeleton files: rendered only when the target is missing, so scaffolding
+# into an existing repo never clobbers hand-written code. Never propagated.
+SKELETON = {
+  "gemspec.erb" => ->(c) { "#{c.gem_name}.gemspec" },
+  "lib/main.rb.erb" => ->(c) { "lib/#{c.require_path}.rb" },
+  "lib/version.rb.erb" => ->(c) { "lib/#{c.require_path}/version.rb" },
+  "sig/main.rbs.erb" => ->(c) { "sig/#{c.require_path}.rbs" },
+  "sig/version.rbs.erb" => ->(c) { "sig/#{c.require_path}/version.rbs" },
+  "test/helper.rb.erb" => ->(*) { "test/test_helper.rb" },
+  "test/skeleton_test.rb.erb" => ->(c) { "test/#{c.gem_name}_test.rb" },
+  "exe/main.erb" => ->(c) { "exe/#{c.gem_name}" },
+  "changelog.erb" => ->(*) { "CHANGELOG.md" }
+}.freeze
+
 # Where each template lands in the consumer repo.
 OUTPUT_FOR = {
   "rubocop.yml.erb" => ".rubocop.yml",
   "pre-commit-config.yaml.erb" => ".pre-commit-config.yaml",
   "mise.toml.erb" => "mise.toml",
+  "gitignore.erb" => ".gitignore"
 }.freeze
 
 class ScaffoldConfig
-  attr_accessor :gem_name, :author, :email, :license, :ruby_quality_path, :description
+  attr_accessor :gem_name, :author, :email, :license, :ruby_quality_path, :description, :rust
 
   def initialize
     @license = "AGPL-3.0-or-later"
@@ -60,6 +83,7 @@ class ScaffoldConfig
     @author = `git config user.name`.strip
     @email = `git config user.email`.strip
     @ruby_quality_path = RUBY_QUALITY_ROOT.to_s
+    @rust = false
   end
 
   def module_name = gem_name.split("-").map { |s| s.split("_").map(&:capitalize).join }.join("::")
@@ -70,7 +94,7 @@ class ScaffoldConfig
   def ruby_quality_path = @ruby_quality_path
 end
 
-options = { dir: Dir.pwd, update: false }
+options = { dir: Dir.pwd, update: false, rust: false, dry_run: false }
 OptionParser.new do |o|
   o.on("--dir PATH") { |v| options[:dir] = v }
   o.on("--author NAME") { |v| options[:author] = v }
@@ -78,6 +102,8 @@ OptionParser.new do |o|
   o.on("--license ID") { |v| options[:license] = v }
   o.on("--description TEXT") { |v| options[:description] = v }
   o.on("--ruby-quality PATH") { |v| options[:rq] = v }
+  o.on("--rust", "Opt into the RbSys native-extension Rakefile and Rust gates") { options[:rust] = true }
+  o.on("--dry-run", "Preview without writing") { options[:dry_run] = true }
   o.on("--update") { options[:update] = true }
 end.parse!
 
@@ -88,14 +114,30 @@ config.email = options[:email] if options[:email]
 config.license = options[:license] if options[:license]
 config.description = options[:description] if options[:description]
 config.ruby_quality_path = options[:rq] if options[:rq]
+config.rust = options[:rust]
 
 output_dir = Pathname.new(options[:dir]).join(config.gem_name)
 templates_dir = RUBY_QUALITY_ROOT.join("templates")
 
-list = options[:update] ? SHARED : (SHARED + SCAFFOLD_ONCE)
-FileUtils.mkdir_p(output_dir)
+def render(template_path, config)
+  ERB.new(template_path.read, trim_mode: "-").result(config.instance_eval { binding })
+end
 
-list.each do |template_name|
+def write_out(output_path, content, executable:, dry_run:)
+  if dry_run
+    puts "  Would write #{output_path}"
+    return
+  end
+  FileUtils.mkdir_p(output_path.dirname)
+  File.write(output_path, content)
+  FileUtils.chmod(0o755, output_path) if executable
+  puts "  Wrote #{output_path}"
+end
+
+render_list = options[:update] ? SHARED : (SHARED + SCAFFOLD_ONCE)
+FileUtils.mkdir_p(output_dir) unless options[:dry_run]
+
+render_list.each do |template_name|
   template_path = templates_dir.join(template_name)
   unless template_path.file?
     warn "  WARNING: missing template #{template_name}"
@@ -103,18 +145,41 @@ list.each do |template_name|
   end
   output_name = OUTPUT_FOR.fetch(template_name, template_name.sub(/\.erb$/, ""))
   output_path = output_dir.join(output_name)
-  FileUtils.mkdir_p(output_path.dirname)
-  content = ERB.new(template_path.read, trim_mode: "-").result(config.instance_eval { binding })
+  content = render(template_path, config)
+  executable = output_name.start_with?("bin/", "exe/")
   if options[:update] && output_path.file?
-    existing = output_path.read
-    if existing == content
+    if output_path.read == content
       puts "  Unchanged #{output_name}"
       next
     end
     puts "  Would update #{output_name} (run without --update to apply)"
     next
   end
-  File.write(output_path, content)
-  FileUtils.chmod(0o755, output_path) if output_name.start_with?("bin/")
-  puts "  Wrote #{output_name}"
+  if output_path.file? && output_path.read == content
+    puts "  Unchanged #{output_name}"
+    next
+  end
+  if output_path.file?
+    puts "  Overwriting #{output_name} (differs from template)"
+  end
+  write_out(output_path, content, executable: executable, dry_run: options[:dry_run])
+end
+
+unless options[:update]
+  SKELETON.each do |template_name, output_for|
+    template_path = templates_dir.join(template_name)
+    unless template_path.file?
+      warn "  WARNING: missing template #{template_name}"
+      next
+    end
+    output_name = output_for.call(config)
+    output_path = output_dir.join(output_name)
+    if output_path.file?
+      puts "  Exists #{output_name} (skeleton never overwrites)"
+      next
+    end
+    content = render(template_path, config)
+    executable = output_name.start_with?("bin/", "exe/")
+    write_out(output_path, content, executable: executable, dry_run: options[:dry_run])
+  end
 end

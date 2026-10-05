@@ -15,7 +15,11 @@ namespace :steep do
 
   desc "Forbid 'untyped' in RBS files except approved exceptions"
   task :no_untyped do
-    Lint.load(File.expand_path("../rbs_exceptions.rb", __dir__)).enforce!(
+    exceptions = File.expand_path("../rbs_exceptions.rb", __dir__)
+    unless File.exist?(exceptions)
+      abort "tasks/rbs_exceptions.rb missing — re-scaffold to create it"
+    end
+    Lint.load(exceptions).enforce!(
       glob: "sig/**/*.rbs",
       pattern: /\buntyped\b/,
       reject_pattern: /^\s*#/,

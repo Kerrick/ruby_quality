@@ -13,7 +13,9 @@ gemspec
 
 gem "irb"
 gem "rake", "~> 13.0"
+<% if rust -%>
 gem "rake-compiler"
+<% end -%>
 
 gem "minitest", "~> 6.0"
 gem "minitest-mock"

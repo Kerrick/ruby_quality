@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+#--
+# SPDX-FileCopyrightText: <%= year %> <%= copyright_holder %>
+#
+# SPDX-License-Identifier: <%= license %>
+#++
+
+require_relative "lib/<%= require_path %>/version"
+
+Gem::Specification.new do |spec|
+  spec.name = "<%= gem_name %>"
+  spec.version = <%= module_name %>::VERSION
+  spec.authors = ["<%= author %>"]
+  spec.email = ["<%= email %>"]
+<% if description.empty? -%>
+  spec.summary = "<%= gem_name %>"
+<% else -%>
+  spec.summary = "<%= description %>"
+<% end -%>
+  spec.description = spec.summary
+  spec.license = "<%= license %>"
+
+  spec.required_ruby_version = ">= 3.2"
+
+  spec.files = Dir["lib/**/*.rb", "sig/**/*.rbs", "exe/*", "README.md", "CHANGELOG.md", "AGENTS.md"]
+  spec.bindir = "exe"
+  spec.executables = ["<%= gem_name %>"]
+  spec.require_paths = ["lib"]
+end

@@ -4,8 +4,3 @@ version = 1
 path = 'Gemfile.lock'
 SPDX-FileCopyrightText = "2026 Kerrick Long <me@kerricklong.com>"
 SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = 'consumers.txt'
-SPDX-FileCopyrightText = "2026 Kerrick Long <me@kerricklong.com>"
-SPDX-License-Identifier = "CC0-1.0"

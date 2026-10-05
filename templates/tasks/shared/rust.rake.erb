@@ -7,32 +7,52 @@
 
 require_relative "lint"
 
+# Rust gates no-op in repos without a Cargo.toml (pure-Ruby default).
+def rust_available?
+  File.exist?("Cargo.toml")
+end
+
+def skip_rust(task_name)
+  puts "Skipping #{task_name} (no Cargo.toml — pure-Ruby repo)"
+end
+
 namespace :rust do
-  desc "Check Rust formatting with cargo fmt"
+  desc "Check Rust formatting with cargo fmt (skipped without Cargo.toml)"
   task :fmt do
-    sh "cargo fmt --check"
+    skip_rust("rust:fmt") unless rust_available?
+    sh "cargo fmt --check" if rust_available?
   end
 
   namespace :fmt do
-    desc "Auto-fix Rust formatting with cargo fmt"
+    desc "Auto-fix Rust formatting with cargo fmt (skipped without Cargo.toml)"
     task :fix do
-      sh "cargo fmt"
+      skip_rust("rust:fmt:fix") unless rust_available?
+      sh "cargo fmt" if rust_available?
     end
   end
 
-  desc "Run Clippy with strict settings (configured in Cargo.toml)"
+  desc "Run Clippy with strict settings, configured in Cargo.toml (skipped without Cargo.toml)"
   task :clippy do
-    sh "cargo clippy -- -D warnings"
+    skip_rust("rust:clippy") unless rust_available?
+    sh "cargo clippy -- -D warnings" if rust_available?
   end
 
-  desc "Fast type checking with cargo check"
+  desc "Fast type checking with cargo check (skipped without Cargo.toml)"
   task :check do
-    sh "cargo check"
+    skip_rust("rust:check") unless rust_available?
+    sh "cargo check" if rust_available?
   end
 
-  desc "Forbid #[allow(clippy::...)] except approved exceptions"
+  desc "Forbid #[allow(clippy::...)] except approved exceptions (skipped without Cargo.toml)"
   task :no_allows do
-    Lint.load(File.expand_path("../clippy_exceptions.rb", __dir__)).enforce!(
+    skip_rust("rust:no_allows") unless rust_available?
+    next unless rust_available?
+
+    exceptions = File.expand_path("../clippy_exceptions.rb", __dir__)
+    unless File.exist?(exceptions)
+      abort "tasks/clippy_exceptions.rb missing — re-scaffold to create it"
+    end
+    Lint.load(exceptions).enforce!(
       glob: "ext/**/*.rs",
       pattern: /#\[allow\(clippy::/,
       violation_name: "#[allow(clippy::...)]"

@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: CC0-1.0
+repos:
+  - repo: local
+    hooks:
+      -   id: bundle-check
+          name: Check Gemfile.lock
+          entry: bundle check
+          language: system
+          files: (Gemfile|Gemfile\.lock)
+          pass_filenames: false

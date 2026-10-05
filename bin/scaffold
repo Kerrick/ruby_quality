@@ -1,0 +1,120 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+#--
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#++
+
+# Renders ruby_quality templates into a target repo.
+#
+#   bin/scaffold GEM_NAME [--dir PATH] [--author NAME] [--email EMAIL]
+#                        [--license ID] [--ruby-quality PATH] [--update]
+#
+# Scaffold mode writes every template. Update mode (used by bin/propagate)
+# re-renders only SHARED_FILES, diffing before overwrite.
+
+require "erb"
+require "fileutils"
+require "optparse"
+require "pathname"
+
+RUBY_QUALITY_ROOT = Pathname.new(__dir__).join("..").expand_path.freeze
+
+# Scaffold-once templates: written once, never touched by bin/propagate.
+SCAFFOLD_ONCE = %w[
+  AGENTS.md.erb
+  Rakefile.erb
+  Gemfile.erb
+  REUSE.toml.erb
+  bin/console.erb
+].freeze
+
+# Shared templates: safe to re-render into consumers on every propagate.
+SHARED = %w[
+  rubocop.yml.erb
+  Steepfile.erb
+  mise.toml.erb
+  pre-commit-config.yaml.erb
+  bin/setup.erb
+  tasks/shared/lint.rake.erb
+  tasks/shared/lint.rb.erb
+  tasks/shared/steep.rake.erb
+  tasks/shared/rust.rake.erb
+  tasks/shared/test.rake.erb
+].freeze
+
+# Where each template lands in the consumer repo.
+OUTPUT_FOR = {
+  "rubocop.yml.erb" => ".rubocop.yml",
+  "pre-commit-config.yaml.erb" => ".pre-commit-config.yaml",
+  "mise.toml.erb" => "mise.toml",
+}.freeze
+
+class ScaffoldConfig
+  attr_accessor :gem_name, :author, :email, :license, :ruby_quality_path, :description
+
+  def initialize
+    @license = "AGPL-3.0-or-later"
+    @description = ""
+    @author = `git config user.name`.strip
+    @email = `git config user.email`.strip
+    @ruby_quality_path = RUBY_QUALITY_ROOT.to_s
+  end
+
+  def module_name = gem_name.split("-").map { |s| s.split("_").map(&:capitalize).join }.join("::")
+  def gem_name_upcase = gem_name.tr("-", "_").upcase
+  def require_path = gem_name.tr("-", "/")
+  def copyright_holder = "#{author} <#{email}>"
+  def year = Time.now.year
+  def ruby_quality_path = @ruby_quality_path
+end
+
+options = { dir: Dir.pwd, update: false }
+OptionParser.new do |o|
+  o.on("--dir PATH") { |v| options[:dir] = v }
+  o.on("--author NAME") { |v| options[:author] = v }
+  o.on("--email EMAIL") { |v| options[:email] = v }
+  o.on("--license ID") { |v| options[:license] = v }
+  o.on("--description TEXT") { |v| options[:description] = v }
+  o.on("--ruby-quality PATH") { |v| options[:rq] = v }
+  o.on("--update") { options[:update] = true }
+end.parse!
+
+config = ScaffoldConfig.new
+config.gem_name = ARGV.shift or abort "Usage: scaffold GEM_NAME [options]"
+config.author = options[:author] if options[:author]
+config.email = options[:email] if options[:email]
+config.license = options[:license] if options[:license]
+config.description = options[:description] if options[:description]
+config.ruby_quality_path = options[:rq] if options[:rq]
+
+output_dir = Pathname.new(options[:dir]).join(config.gem_name)
+templates_dir = RUBY_QUALITY_ROOT.join("templates")
+
+list = options[:update] ? SHARED : (SHARED + SCAFFOLD_ONCE)
+FileUtils.mkdir_p(output_dir)
+
+list.each do |template_name|
+  template_path = templates_dir.join(template_name)
+  unless template_path.file?
+    warn "  WARNING: missing template #{template_name}"
+    next
+  end
+  output_name = OUTPUT_FOR.fetch(template_name, template_name.sub(/\.erb$/, ""))
+  output_path = output_dir.join(output_name)
+  FileUtils.mkdir_p(output_path.dirname)
+  content = ERB.new(template_path.read, trim_mode: "-").result(config.instance_eval { binding })
+  if options[:update] && output_path.file?
+    existing = output_path.read
+    if existing == content
+      puts "  Unchanged #{output_name}"
+      next
+    end
+    puts "  Would update #{output_name} (run without --update to apply)"
+    next
+  end
+  File.write(output_path, content)
+  FileUtils.chmod(0o755, output_path) if output_name.start_with?("bin/")
+  puts "  Wrote #{output_name}"
+end

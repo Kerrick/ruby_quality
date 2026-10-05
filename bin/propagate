@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Re-render shared ruby_quality files into consumer repos.
+# Consumers are selected by the caller and confirmed by their pin: only
+# repos whose .rubocop.yml references ruby_quality get updated. The
+# dependency points from consumer to ruby_quality, never the reverse.
+#
+# Usage: bin/propagate DIR-or-GLOB [DIR-or-GLOB ...]
+
+set -euo pipefail
+RQ_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: bin/propagate DIR-or-GLOB [DIR-or-GLOB ...]" >&2
+  exit 1
+fi
+
+for repo in "$@"; do
+  [ -d "$repo" ] || continue
+  grep -q "ruby_quality" "$repo/.rubocop.yml" 2>/dev/null || continue
+  echo "== $repo"
+  "$RQ_ROOT/bin/scaffold" "$(basename "$repo")" --dir "$(dirname "$repo")" \
+    --ruby-quality "$RQ_ROOT" --update
+done

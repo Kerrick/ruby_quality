@@ -1,0 +1,111 @@
+<!--
+  SPDX-FileCopyrightText: 2026 Kerrick Long <me@kerricklong.com>
+  SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
+# AGENTS.md
+
+## Project Identity
+
+Project Name: <%= gem_name %>
+
+Description: <%= description %>
+
+## Stability & Compatibility
+
+- Project Status: Pre-1.0. 
+- Breaking Changes: Backward compatibility is not a priority. Since there are no external users, you are encouraged to refactor APIs for better ergonomics and performance even if it breaks existing code.
+- Requirement: All breaking changes must be explicitly documented in the [CHANGELOG.md](CHANGELOG.md)'s Unreleased section to ensure transparency.
+
+## 1. Standards
+
+### Strict Requirements
+
+- Every file must begin with an SPDX-compliant header. Use `<%= license %>` for code; `CC-BY-SA-4.0` for documentation. `reuse annotate` can help you generate the header. In Ruby files, wrap SPDX comments in `#--` / `#++` to hide them from RDoc output.
+- Every line of Ruby must be covered by tests that would stand up to mutation testing.
+  - Tests must be meaningful and verify specific behavior or rendering output; simply verifying that code doesn't crash is insufficient and unacceptable.
+- Pre-commit: Use `bundle exec rake` to ensure commit-readiness. See Tools for detailed instructions.
+- Git Pager: Set `PAGER=cat` for `git` commands (e.g., `PAGER=cat git diff`).
+
+### Tools
+
+- Always run `bundle exec ruby` to ensure libraries are loaded. Never run `ruby -Ilib:test ...` directly.
+- Always use `bundle exec rake` for running tests, linting, or checking compilation.
+  - Usage:
+    - Runs default task (test + lint + typecheck): `bundle exec rake`. Do this before considering a commit ready.
+- Setup: `bin/setup` must ensure all dependencies are installed.
+- Rake: Our rake tasks use `git ls-files`, so errors happen when you move or delete files. In this case, ask the user to stage changes for you.
+
+### Ruby Standards
+
+- Use `Data.define` for all value objects. Prefer `class Foo < Data.define()` over `Foo = Data.define() do`.
+- Use `class` for all entities.
+- Type every Ruby class/method in `.rbs`: no `untyped`, no `initialize` (use `self.new`).
+- Document every public Ruby class/method for humans with RDoc (not YARD) in `.rb` files; `.rbs` files carry types only, zero comments.
+- Every significant architectural and design decision must be documented for contributors in markdown files. Mermaid is allowed.
+
+## 2. Configuration & Tooling
+
+### Development Environment
+
+- Scripting Preference: Simple `sed` or shell one-liners are fine. When a one-off script grows to multiple lines of logic, prefer a temporary rake task or `ruby -e '...'` over a multi-line shell script in a string. Ruby's `File.read`/`File.write`, `Dir.glob`, and regex handle complex transformations more cleanly.
+
+### Documentation
+
+- Documentation should separate "User Guide" from "Contributor Guide".
+  - Files within `doc/contributors/` are for developers changing this software.
+  - Files within `doc/` outside of `contributors/` are for users of this software.
+- Style Guide: You must follow the [Documentation Style Guide](doc/contributors/documentation_style.md). This dictates the Alexandrian/Zinsser prose style and strict RDoc formatting required for all public API documentation.
+- Do not write .md files for something RDoc (Ruby) can generate. Use RDoc for documentation.
+
+
+## 3. Committing
+
+- Who commits: do not stage (don't `git add`) unless explicitly instructed. Do not commit unless explicitly instructed. Suggest a commit message when you finish, even if not instructed.
+- When: Before reporting the task as complete to the user, suggest the commit message.
+- What: Consider not what you remember, but EVERYTHING in the `git diff` and `git diff --cached`.
+- Format: Use [Conventional Commits](https://www.conventionalcommits.org/).
+- Body: Explanation if necessary (wrap at 72 chars).
+    - Explain why this is the implementation, as opposed to other possible implementations.
+    - Skip the body entirely if it's rote, a duplication of the diff, or otherwise unhelpful.
+    - DON'T list the files changed or the edits made in the body. Don't provide a bulleted list of changes. Use prose to explain the problem and the solution.
+    - DON'T use markdown syntax (no backticks, no bolding, no lists, no links). The commit message must be plain text.
+- Conventional Commit type conventions by directory:
+    - `lib/`, `exe/`, `sig/`: Use `feat`, `fix`, `refactor`, `perf` as appropriate.
+    - `bin/`, `tasks/`, `.builds/`, CI/CD: Use `chore` for tooling internal to developing this gem. Use `feat`/`fix` for changes that affect downstream users.
+    - `examples/`: Always `docs` (documentation by example).
+    - `test/`: Use `test` for new/changed tests, or match the type of the code being tested.
+    - `doc/`: Always `docs`.
+  
+## 4. Changelog
+
+- Follow [Semantic Versioning](https://semver.org/)
+- Follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) specification.
+- What belongs in CHANGELOG.md: Only changes that affect executable users or higher-level library developers who use or depend on `<%= gem_name %>`:
+    - New public APIs or CLI flags
+    - Backwards-incompatible type signature changes, or behavioral additions to type signature changes
+    - Observable behavior changes (rendering, styling, layout)
+    - Deprecations and removals
+    - Breaking changes
+- What does not belong in CHANGELOG.md: Internal or non-behavioral changes that don't affect downstream users:
+    - Test additions or improvements
+    - Documentation updates, RDoc fixes, markdown clarifications
+    - Refactors of internal code
+    - New or modified example code
+    - Internal tooling, CI/CD, or build configuration changes
+    - Code style or linting changes
+    - Performance improvements that affect applications
+- Changelogs should be useful to downstream developers (both app and library developers), not simple restatements of diffs or commit messages.
+- The Unreleased section must be considered "since the last git tag". Therefore, if a change was done in one commit and undone in another (both since the last tag), the second commit should remove its changelog entry.
+- Location: New entries always go in `## [Unreleased]`. Never edit past version sections (e.g., `## [0.4.0]`)—those are frozen history.
+
+## 5. Definition of Done (DoD)
+
+Before considering a task complete and returning control to the user, you must ensure:
+
+0. Production Ready: RBS types are complete and accurate (no `untyped`), errors are handled with good DX, documentation follows guidelines, high code quality (scount rule; no excuses about pre-existing debt).
+1. Default Rake Task Passes: Run `bundle exec rake` (no args). Confirm it passes with ZERO errors and ZERO warnings.
+  - If you think the Rake is looking for deleted files, STOP EVERYTHING and tell the user.
+2. Documentation Updated: If public APIs or observable behavior changed, update relevant RDoc, RBS, `doc/` files, and/or `README.md`.
+3. Changelog Updated: If public APIs, observable behavior, or gemspec dependencies have changed, update [CHANGELOG.md](CHANGELOG.md)'s Unreleased section.
+4. Commit Message Suggested: Your final message to the user must include a suggested commit message block.

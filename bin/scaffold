@@ -45,6 +45,7 @@ SHARED = %w[
   mise.toml.erb
   pre-commit-config.yaml.erb
   bin/setup.erb
+  doc/contributors/documentation_style.md.erb
   tasks/shared/lint.rake.erb
   tasks/shared/lint.rb.erb
   tasks/shared/steep.rake.erb

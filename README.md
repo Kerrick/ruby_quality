@@ -22,8 +22,9 @@ and the Rust quality gates.
 * `templates/` — ERB scaffold templates (`AGENTS.md`, `Rakefile`, `Gemfile`,
   `Steepfile`, `mise.toml`, `REUSE.toml`, `.rubocop.yml`, `.gitignore`,
   `.pre-commit-config.yaml`, `bin/setup`, `bin/console`, `tasks/*.rake`,
-  `tasks/*_exceptions.rb`, plus skeleton templates for the gemspec, `lib/`,
-  `sig/`, `test/`, `exe/`, and `CHANGELOG.md`).
+  `tasks/*_exceptions.rb`, `doc/contributors/documentation_style.md`, plus
+  skeleton templates for the gemspec, `lib/`, `sig/`, `test/`, `exe/`, and
+  `CHANGELOG.md`).
 * `bin/scaffold` — renders `templates/` into a new or existing repo.
 * `bin/propagate` — re-renders *shared* files into the repos you name
   (dirs or globs), skipping any whose `.rubocop.yml` doesn't pin
@@ -32,7 +33,8 @@ and the Rust quality gates.
 ## Shared vs scaffold-once
 
 *Shared* (overwritten by `bin/propagate`): `.rubocop.yml`, `Steepfile`,
-`tasks/shared/*`, `bin/setup`, `.pre-commit-config.yaml`, `mise.toml`.
+`tasks/shared/*`, `bin/setup`, `.pre-commit-config.yaml`, `mise.toml`,
+`doc/contributors/documentation_style.md`.
 They exist so quality gates mean the same thing in every repo.
 `.rubocop.yml` is a URL pin to this repo's `config/rubocop.yml` — rule
 changes propagate with no per-repo sync. `mise.toml` and Rake tasks

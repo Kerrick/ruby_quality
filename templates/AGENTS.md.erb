@@ -40,7 +40,7 @@ Description: <%= description %>
 
 - Use `Data.define` for all value objects. Prefer `class Foo < Data.define()` over `Foo = Data.define() do`.
 - Use `class` for all entities.
-- Type every Ruby class/method in `.rbs`: no `untyped`, no `initialize` (use `self.new`).
+- Type every Ruby class/method in `.rbs`: no `untyped`. Declare `initialize` for ordinary classes. For `Data.define` subclasses, declare `class Foo < Data`, an `attr_reader` per member, and `self.new` (and `self.[]` if used) with positional and keyword overloads, because `Data.new` returns `bot`. If the subclass overrides `initialize`, also declare it, keyword-only.
 - Document every public Ruby class/method for humans with RDoc (not YARD) in `.rb` files; `.rbs` files carry types only, zero comments.
 - Every significant architectural and design decision must be documented for contributors in markdown files. Mermaid is allowed.
 
